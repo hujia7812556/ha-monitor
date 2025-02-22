@@ -61,8 +61,8 @@ jobs:
             chmod +x ${{ secrets.DEPLOY_TARGET }}/ha-monitor
 
             # 从supervisor配置中提取日志路径
-            ERR_LOG=$(grep stderr_logfile supervisor.conf | cut -d= -f2 | tr -d ' ')
-            OUT_LOG=$(grep stdout_logfile supervisor.conf | cut -d= -f2 | tr -d ' ')
+            ERR_LOG=$(grep stderr_logfile ${{ secrets.DEPLOY_TARGET }}/supervisor.conf | cut -d= -f2 | tr -d ' ')
+            OUT_LOG=$(grep stdout_logfile ${{ secrets.DEPLOY_TARGET }}/supervisor.conf | cut -d= -f2 | tr -d ' ')
             
             # 准备目录和文件
             sudo mkdir -p $(dirname $ERR_LOG)
