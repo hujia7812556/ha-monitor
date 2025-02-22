@@ -38,9 +38,6 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_TARGET: ${{ secrets.DEPLOY_TARGET }}
         run: |
-          # 添加目标服务器到已知主机
-          ssh-keyscan -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
-          
           # 创建目标目录(如果不存在)
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_TARGET"
           
