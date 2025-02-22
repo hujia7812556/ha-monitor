@@ -29,10 +29,9 @@ jobs:
       - name: Generate supervisor.conf
         run: |
           cp supervisor.conf supervisor.conf.tmp
-          sed -i "s#/path/to/ha-monitor#${{ secrets.DEPLOY_TARGET }}/ha-monitor#" supervisor.conf.tmp
-          sed -i "s#/path/to/config.yaml#${{ secrets.DEPLOY_TARGET }}/config.yaml#" supervisor.conf.tmp
-          sed -i "s#/path/to/working/directory#${{ secrets.DEPLOY_TARGET }}#" supervisor.conf.tmp
-          sed -i "s#your-user#${{ secrets.DEPLOY_USER }}#" supervisor.conf.tmp
+          sed -i "s#command=.*#command=${{ secrets.DEPLOY_TARGET }}/ha-monitor -config ${{ secrets.DEPLOY_TARGET }}/config.yaml#" supervisor.conf.tmp
+          sed -i "s#directory=.*#directory=${{ secrets.DEPLOY_TARGET }}#" supervisor.conf.tmp
+          sed -i "s#user=.*#user=${{ secrets.DEPLOY_USER }}#" supervisor.conf.tmp
           mv supervisor.conf.tmp supervisor.conf
 
       - name: Build
@@ -58,8 +57,9 @@ jobs:
           key: ${{ secrets.DEPLOY_KEY }}
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
+            cd $DEPLOY_TARGET
             # 设置可执行权限
-            chmod +x $DEPLOY_TARGET/ha-monitor
+            chmod +x ha-monitor
 
             # 移动 supervisor 配置文件并重命名
             sudo mv supervisor.conf /etc/supervisor/conf.d/ha-monitor.conf
