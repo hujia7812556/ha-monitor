@@ -17,6 +17,8 @@ func main() {
 	configPath := flag.String("config", "config/config.yaml", "path to config file")
 	flag.Parse()
 
+	log.Println("Starting HA Monitor...")
+
 	loader, err := config.NewLoader(*configPath)
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -36,6 +38,7 @@ func main() {
 	)
 
 	// 创建一个支持秒级调度的cron调度器
+	// 注意：配置虽然支持热加载，但schedule字段的更改并不会更新cron调度器
 	c := cron.New(cron.WithSeconds())
 
 	if _, err := c.AddFunc(cfg.Monitor.Schedule, func() {
