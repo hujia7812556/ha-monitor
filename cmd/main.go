@@ -17,7 +17,7 @@ func main() {
 	configPath := flag.String("config", "config/config.yaml", "path to config file")
 	flag.Parse()
 
-	log.Println("Starting HA Monitor...")
+	log.Println("Starting HomeAssistant Monitor...")
 
 	loader, err := config.NewLoader(*configPath)
 	if err != nil {
