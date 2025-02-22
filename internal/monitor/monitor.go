@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -170,4 +171,5 @@ func (m *Monitor) UpdateConfig(url string, token string, notify NotifyConfig, re
 
 func init() {
 	log.SetFlags(log.Ldate | log.Ltime) // 只显示日期和时间（到秒）
+	log.SetOutput(os.Stdout)
 }
