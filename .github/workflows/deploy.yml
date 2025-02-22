@@ -26,6 +26,15 @@ jobs:
           sed -i "s#api_token:.*#api_token: \"${{ secrets.NOTIFY_API_TOKEN }}\"#" config/config.yaml
           sed -i "s#topic_id:.*#topic_id: ${{ secrets.NOTIFY_TOPIC_ID }}#" config/config.yaml
 
+      - name: Generate supervisor.conf
+        run: |
+          cp supervisor.conf supervisor.conf.tmp
+          sed -i "s#/path/to/ha-monitor#${{ secrets.DEPLOY_TARGET }}/ha-monitor#" supervisor.conf.tmp
+          sed -i "s#/path/to/config.yaml#${{ secrets.DEPLOY_TARGET }}/config.yaml#" supervisor.conf.tmp
+          sed -i "s#/path/to/working/directory#${{ secrets.DEPLOY_TARGET }}#" supervisor.conf.tmp
+          sed -i "s#your-user#${{ secrets.DEPLOY_USER }}#" supervisor.conf.tmp
+          mv supervisor.conf.tmp supervisor.conf
+
       - name: Build
         run: |
           GOOS=linux GOARCH=amd64 go build -o ha-monitor ./cmd/main.go
