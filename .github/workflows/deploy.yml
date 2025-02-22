@@ -64,10 +64,10 @@ jobs:
             sudo mkdir -p /var/logs
             sudo touch /var/log/ha-monitor.out.log
             sudo touch /var/log/ha-monitor.err.log
-            sudo chown ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} /var/logs/ha-monitor.out.log
-            sudo chown ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} /var/logs/ha-monitor.err.log
-            sudo chmod 644 /var/logs/ha-monitor.out.log
-            sudo chmod 644 /var/logs/ha-monitor.err.log
+            sudo chown ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} /var/log/ha-monitor.out.log
+            sudo chown ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} /var/log/ha-monitor.err.log
+            sudo chmod 644 /var/log/ha-monitor.out.log
+            sudo chmod 644 /var/log/ha-monitor.err.log
 
             # 移动 supervisor 配置文件并重命名
             sudo mv supervisor.conf /etc/supervisor/conf.d/ha-monitor.conf
