@@ -1,0 +1,10 @@
+monitor:
+  ha_url: ""  # 替换为你的 HomeAssistant 地址
+  ha_token: ""
+  retry_times: 3                                   # 重试次数
+  timeout: 10                                      # 超时时间(秒)
+  schedule: "0/30 * 0,8-23 * * *"                 # 监控时间表
+  notify:
+    api_url: ""
+    api_token: ""
+    topic_id: 0

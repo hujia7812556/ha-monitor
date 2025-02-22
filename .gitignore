@@ -1,0 +1,45 @@
+# 配置文件
+config/config.yaml
+
+# IDE - VSCode
+.vscode/
+*.code-workspace
+
+# IDE - GoLand/IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# IDE - Visual Studio
+.vs/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Go
+# 编译后的二进制文件
+ha-monitor
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# 测试二进制文件
+*.test
+
+# 覆盖率文件
+*.out
+
+# 依赖目录
+vendor/
+
+# 日志文件
+*.log
+*.log.*
+
+# 系统文件
+.DS_Store
+Thumbs.db 

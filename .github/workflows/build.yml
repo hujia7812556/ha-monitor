@@ -1,0 +1,68 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+
+      - name: Generate config.yaml
+        run: |
+          cp config/config.example.yaml config/config.yaml
+          sed -i "s#ha_url:.*#ha_url: \"${{ secrets.HA_URL }}\"#" config/config.yaml
+          sed -i "s#ha_token:.*#ha_token: \"${{ secrets.HA_TOKEN }}\"#" config/config.yaml
+          sed -i "s#api_url:.*#api_url: \"${{ secrets.NOTIFY_API_URL }}\"#" config/config.yaml
+          sed -i "s#api_token:.*#api_token: \"${{ secrets.NOTIFY_API_TOKEN }}\"#" config/config.yaml
+          sed -i "s#topic_id:.*#topic_id: ${{ secrets.NOTIFY_TOPIC_ID }}#" config/config.yaml
+
+      - name: Build
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o ha-monitor ./cmd/main.go
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ha-monitor
+            config/config.yaml
+            supervisor.conf
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy to server
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_TARGET: ${{ secrets.DEPLOY_TARGET }}
+        run: |
+          # 写入SSH私钥
+          mkdir -p ~/.ssh/
+          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          
+          # 添加目标服务器到已知主机
+          ssh-keyscan -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
+          
+          # 创建目标目录(如果不存在)
+          ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_TARGET"
+          
+          # 复制文件到服务器
+          scp -i ~/.ssh/deploy_key -P $DEPLOY_PORT ha-monitor config/config.yaml supervisor.conf $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_TARGET/
+          
+          # 设置可执行权限
+          ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "chmod +x $DEPLOY_TARGET/ha-monitor"
+          
+          # 重启服务
+          ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "supervisorctl restart ha-monitor" 
