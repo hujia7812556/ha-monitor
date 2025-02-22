@@ -30,30 +30,33 @@ jobs:
         run: |
           GOOS=linux GOARCH=amd64 go build -o ha-monitor ./cmd/main.go
 
-      - name: Deploy to server
-        env:
-          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
-          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
-          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-          DEPLOY_TARGET: ${{ secrets.DEPLOY_TARGET }}
-        run: |
-          # 创建目标目录(如果不存在)
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_TARGET"
-          
-          # 复制程序和配置文件到服务器
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -P $DEPLOY_PORT ha-monitor config/config.yaml $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_TARGET/
-          
-          # 设置可执行权限
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p $DEPLOY_PORT 
-          $DEPLOY_USER@$DEPLOY_HOST "chmod +x $DEPLOY_TARGET/
-          ha-monitor"
+      - name: Deploy files
+        uses: appleboy/scp-action@v0.1.4
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          source: "ha-monitor,config.yaml,supervisor.conf"
+          target: "${{ secrets.DEPLOY_TARGET }}"
+          strip_components: 0
 
-          # 复制 supervisor 配置文件并重命名
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -P $DEPLOY_PORT supervisor.conf $DEPLOY_USER@$DEPLOY_HOST:/tmp/ha-monitor.conf
-          
-          # 使用 sudo 移动配置文件到正确位置并重启服务
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "sudo mv /tmp/ha-monitor.conf /etc/supervisor/conf.d/ && \
-            chmod +x $DEPLOY_TARGET/ha-monitor && \
-            sudo supervisorctl update && \
-            sudo supervisorctl restart ha-monitor" 
+      - name: Setup service
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.USER }}
+          key: ${{ secrets.DEPLOY_KEY }}
+          port: ${{ secrets.DEPLOY_PORT }}
+          script: |
+            # 设置可执行权限
+            chmod +x $DEPLOY_TARGET/ha-monitor
+
+            # 移动 supervisor 配置文件并重命名
+            sudo mv supervisor.conf /etc/supervisor/conf.d/ha-monitor.conf
+
+            # 更新 supervisor 配置
+            sudo supervisorctl update
+
+            # 重启 supervisor 服务
+            sudo supervisorctl restart ha-monitor
