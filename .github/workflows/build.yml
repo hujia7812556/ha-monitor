@@ -47,21 +47,21 @@ jobs:
           ssh-keyscan -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
           
           # 创建目标目录(如果不存在)
-          ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_TARGET"
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "mkdir -p $DEPLOY_TARGET"
           
           # 复制程序和配置文件到服务器
-          scp -i ~/.ssh/deploy_key -P $DEPLOY_PORT ha-monitor config/config.yaml $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_TARGET/
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -P $DEPLOY_PORT ha-monitor config/config.yaml $DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_TARGET/
           
           # 设置可执行权限
-          ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT 
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p $DEPLOY_PORT 
           $DEPLOY_USER@$DEPLOY_HOST "chmod +x $DEPLOY_TARGET/
           ha-monitor"
 
           # 复制 supervisor 配置文件并重命名
-          scp -i ~/.ssh/deploy_key -P $DEPLOY_PORT supervisor.conf $DEPLOY_USER@$DEPLOY_HOST:/tmp/ha-monitor.conf
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -P $DEPLOY_PORT supervisor.conf $DEPLOY_USER@$DEPLOY_HOST:/tmp/ha-monitor.conf
           
           # 使用 sudo 移动配置文件到正确位置并重启服务
-          ssh -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "sudo mv /tmp/ha-monitor.conf /etc/supervisor/conf.d/ && \
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/deploy_key -p $DEPLOY_PORT $DEPLOY_USER@$DEPLOY_HOST "sudo mv /tmp/ha-monitor.conf /etc/supervisor/conf.d/ && \
             chmod +x $DEPLOY_TARGET/ha-monitor && \
             sudo supervisorctl update && \
             sudo supervisorctl restart ha-monitor" 
