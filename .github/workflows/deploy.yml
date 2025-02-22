@@ -78,7 +78,7 @@ jobs:
             sudo chmod 644 $OUT_LOG
 
             # 移动 supervisor 配置文件并重命名
-            sudo mv supervisor.conf /etc/supervisor/conf.d/ha-monitor.conf
+            sudo mv ${{ secrets.DEPLOY_TARGET }}/supervisor.conf /etc/supervisor/conf.d/ha-monitor.conf
 
             # 更新 supervisor 配置
             sudo supervisorctl update
