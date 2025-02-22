@@ -1,4 +1,4 @@
-name: Build and Release
+name: Deploy
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:  # 支持手动触发
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,11 +38,6 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_TARGET: ${{ secrets.DEPLOY_TARGET }}
         run: |
-          # 写入SSH私钥
-          mkdir -p ~/.ssh/
-          echo "$DEPLOY_KEY" > ~/.ssh/deploy_key
-          chmod 600 ~/.ssh/deploy_key
-          
           # 添加目标服务器到已知主机
           ssh-keyscan -p $DEPLOY_PORT $DEPLOY_HOST >> ~/.ssh/known_hosts
           
