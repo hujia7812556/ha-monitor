@@ -59,7 +59,7 @@ jobs:
           script: |
             cd $DEPLOY_TARGET
             # 设置可执行权限
-            chmod +x ha-monitor
+            chmod +x ./ha-monitor
 
             # 移动 supervisor 配置文件并重命名
             sudo mv supervisor.conf /etc/supervisor/conf.d/ha-monitor.conf
