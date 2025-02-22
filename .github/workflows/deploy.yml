@@ -60,14 +60,22 @@ jobs:
             # 设置可执行权限
             chmod +x ${{ secrets.DEPLOY_TARGET }}/ha-monitor
 
+            # 从supervisor配置中提取日志路径
+            ERR_LOG=$(grep stderr_logfile supervisor.conf | cut -d= -f2 | tr -d ' ')
+            OUT_LOG=$(grep stdout_logfile supervisor.conf | cut -d= -f2 | tr -d ' ')
+            
             # 准备目录和文件
-            sudo mkdir -p /var/logs
-            sudo touch /var/log/ha-monitor.out.log
-            sudo touch /var/log/ha-monitor.err.log
-            sudo chown ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} /var/log/ha-monitor.out.log
-            sudo chown ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} /var/log/ha-monitor.err.log
-            sudo chmod 644 /var/log/ha-monitor.out.log
-            sudo chmod 644 /var/log/ha-monitor.err.log
+            sudo mkdir -p $(dirname $ERR_LOG)
+            sudo mkdir -p $(dirname $OUT_LOG)
+
+            sudo touch $ERR_LOG
+            sudo touch $OUT_LOG
+
+            sudo chown ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} $ERR_LOG
+            sudo chown ${{ secrets.DEPLOY_USER }}:${{ secrets.DEPLOY_USER }} $OUT_LOG
+            
+            sudo chmod 644 $ERR_LOG
+            sudo chmod 644 $OUT_LOG
 
             # 移动 supervisor 配置文件并重命名
             sudo mv supervisor.conf /etc/supervisor/conf.d/ha-monitor.conf
