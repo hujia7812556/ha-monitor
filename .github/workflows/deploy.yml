@@ -48,6 +48,7 @@ jobs:
           source: "ha-monitor,config.yaml,supervisor.conf"
           target: "${{ secrets.DEPLOY_TARGET }}"
           strip_components: 0
+          overwrite: true    # 明确指定覆盖
 
       - name: Setup service
         uses: appleboy/ssh-action@v1.0.0
