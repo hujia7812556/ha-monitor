@@ -19,7 +19,7 @@ jobs:
 
       - name: Generate config.yaml
         run: |
-          cp config/config.example.yaml config/config.yaml
+          cp config/config.example.yaml config.yaml
           sed -i "s#ha_url:.*#ha_url: \"${{ secrets.HA_URL }}\"#" config/config.yaml
           sed -i "s#ha_token:.*#ha_token: \"${{ secrets.HA_TOKEN }}\"#" config/config.yaml
           sed -i "s#api_url:.*#api_url: \"${{ secrets.NOTIFY_API_URL }}\"#" config/config.yaml
@@ -48,7 +48,6 @@ jobs:
           source: "ha-monitor,config.yaml,supervisor.conf"
           target: "${{ secrets.DEPLOY_TARGET }}"
           strip_components: 0
-          overwrite: true    # 明确指定覆盖
 
       - name: Setup service
         uses: appleboy/ssh-action@v1.0.0

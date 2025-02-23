@@ -3,7 +3,7 @@ monitor:
   ha_token: ""
   retry_times: 3                                   # 重试次数
   timeout: 10                                      # 超时时间(秒)
-  schedule: "0 */5 8-23 * * *"                     # 监控时间表，支持秒级调度
+  schedule: "0 */5 8-23 * * *"                     # 监控时间表，支持秒级调度，此配置不支持热更新，需要重启服务
   notify:
     api_url: ""
     api_token: ""
