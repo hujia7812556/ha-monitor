@@ -77,16 +77,29 @@ func (c *Client) RestartDevice() error {
 	return nil
 }
 
+func (c *Client) getTokenSign(method, bodyHash, token, path string, timestamp int64) string {
+	// 构建 stringToSign
+	// method + "\n" + bodyHash + "\n" + token + "\n" + path
+	stringToSign := fmt.Sprintf("%s\n%s\n%s\n%s", method, bodyHash, token, path)
+
+	// 构建完整签名字符串：client_id + t + nonce + stringToSign
+	// nonce 是可选的，这里我们不使用
+	str := fmt.Sprintf("%s%d%s", c.config.AccessID, timestamp, stringToSign)
+
+	// 使用 HMAC-SHA256 计算签名
+	h := hmac.New(sha256.New, []byte(c.config.AccessKey))
+	h.Write([]byte(str))
+
+	// 转换为大写的十六进制字符串
+	return strings.ToUpper(hex.EncodeToString(h.Sum(nil)))
+}
+
 func (c *Client) getNewToken() (*tokenInfo, error) {
 	timestamp := time.Now().UnixMilli()
 	path := "/v1.0/token?grant_type=1"
 
-	// 获取令牌时的签名计算方式不同
-	// 直接使用 HMAC-SHA256(accessId + timestamp, accessKey)
-	h := hmac.New(sha256.New, []byte(c.config.AccessKey))
-	message := fmt.Sprintf("%s%d", c.config.AccessID, timestamp)
-	h.Write([]byte(message))
-	signStr := strings.ToUpper(hex.EncodeToString(h.Sum(nil)))
+	// 获取令牌的签名
+	signStr := c.getTokenSign("GET", "", "", path, timestamp)
 
 	url := fmt.Sprintf("https://openapi.tuya%s.com%s", c.config.Region, path)
 	req, err := http.NewRequest("GET", url, nil)
@@ -96,15 +109,14 @@ func (c *Client) getNewToken() (*tokenInfo, error) {
 
 	// 设置请求头
 	req.Header.Set("client_id", c.config.AccessID)
-	req.Header.Set("sign", signStr) // 使用 sign 而不是 secret
+	req.Header.Set("secret", signStr)
 	req.Header.Set("sign_method", "HMAC-SHA256")
 	req.Header.Set("t", fmt.Sprintf("%d", timestamp))
 
 	// 打印请求信息以便调试
 	log.Printf("Request URL: %s", url)
 	log.Printf("Request Headers: client_id=%s, t=%d", c.config.AccessID, timestamp)
-	log.Printf("Sign Message: %s", message)
-	log.Printf("Sign Result: %s", signStr)
+	log.Printf("Sign Message: %s", signStr)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -140,9 +152,8 @@ func (c *Client) refreshToken(refreshToken string) (*tokenInfo, error) {
 	timestamp := time.Now().UnixMilli()
 	path := "/v1.0/token/" + refreshToken
 
-	// GET 请求的签名字符串格式
-	stringToSign := fmt.Sprintf("GET\n\n\n%s", path)
-	signStr := c.calculateSign(stringToSign, timestamp)
+	// 刷新令牌的签名
+	signStr := c.getTokenSign("GET", "", "", path, timestamp)
 
 	url := fmt.Sprintf("https://openapi.tuya%s.com%s", c.config.Region, path)
 	req, err := http.NewRequest("GET", url, nil)
@@ -218,12 +229,6 @@ func (c *Client) getToken() (string, error) {
 }
 
 func (c *Client) controlSwitch(on bool) error {
-	// 获取访问令牌
-	token, err := c.getToken()
-	if err != nil {
-		return fmt.Errorf("get token failed: %w", err)
-	}
-
 	timestamp := time.Now().UnixMilli()
 	path := fmt.Sprintf("/v1.0/iot-03/devices/%s/commands", c.config.DeviceID)
 	body := map[string]interface{}{
@@ -240,18 +245,23 @@ func (c *Client) controlSwitch(on bool) error {
 		return err
 	}
 
+	// 计算请求体的哈希值
+	contentHash := fmt.Sprintf("%x", sha256.Sum256(jsonData))
+
+	// 获取访问令牌
+	token, err := c.getToken()
+	if err != nil {
+		return fmt.Errorf("get token failed: %w", err)
+	}
+
+	// 计算签名
+	signStr := c.getTokenSign("POST", contentHash, token, path, timestamp)
+
 	url := fmt.Sprintf("https://openapi.tuya%s.com%s", c.config.Region, path)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return err
 	}
-
-	// POST 请求的签名字符串格式：
-	// client_id + access_token + t + stringToSign
-	// stringToSign = method + "\n" + body_hash + "\n" + headers_hash + "\n" + url
-	contentHash := fmt.Sprintf("%x", sha256.Sum256(jsonData))
-	stringToSign := fmt.Sprintf("POST\n%s\n\n%s", contentHash, path)
-	signStr := c.calculateSign(stringToSign, timestamp)
 
 	// 设置请求头
 	req.Header.Set("client_id", c.config.AccessID)
@@ -282,18 +292,6 @@ func (c *Client) controlSwitch(on bool) error {
 	}
 
 	return nil
-}
-
-func (c *Client) calculateSign(stringToSign string, timestamp int64) string {
-	// 生成签名字符串：client_id + t + stringToSign
-	str := fmt.Sprintf("%s%d%s", c.config.AccessID, timestamp, stringToSign)
-
-	// 使用 HMAC-SHA256 计算签名
-	h := hmac.New(sha256.New, []byte(c.config.AccessKey))
-	h.Write([]byte(str))
-
-	// 转换为大写的十六进制字符串
-	return strings.ToUpper(hex.EncodeToString(h.Sum(nil)))
 }
 
 func (c *Client) GetConfig() Config {
