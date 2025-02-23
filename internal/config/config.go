@@ -20,12 +20,22 @@ type MonitorConfig struct {
 	Timeout    int          `mapstructure:"timeout"`
 	Schedule   string       `mapstructure:"schedule"`
 	Notify     NotifyConfig `mapstructure:"notify"`
+	Tuya       TuyaConfig   `mapstructure:"tuya"`
 }
 
 type NotifyConfig struct {
 	APIURL   string `mapstructure:"api_url"`
 	APIToken string `mapstructure:"api_token"`
 	TopicID  int    `mapstructure:"topic_id"`
+}
+
+type TuyaConfig struct {
+	Enabled     bool   `mapstructure:"enabled"`
+	AccessID    string `mapstructure:"access_id"`
+	AccessKey   string `mapstructure:"access_key"`
+	DeviceID    string `mapstructure:"device_id"`
+	Region      string `mapstructure:"region"`
+	WaitSeconds int    `mapstructure:"wait_seconds"`
 }
 
 type Loader struct {

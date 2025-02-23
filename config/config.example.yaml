@@ -8,3 +8,10 @@ monitor:
     api_url: ""
     api_token: ""
     topic_id: 0
+  tuya:
+    enabled: false                                 # 是否启用涂鸦智能插座重启功能
+    access_id: ""                                  # 涂鸦开发者平台 Access ID
+    access_key: ""                                 # 涂鸦开发者平台 Access Key
+    device_id: ""                                  # 智能插座设备 ID
+    region: "cn"                                   # 区域：cn(中国), us(美国), eu(欧洲), in(印度)
+    wait_seconds: 10                               # 关闭电源后等待多少秒再开启

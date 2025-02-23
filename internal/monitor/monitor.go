@@ -8,16 +8,19 @@ import (
 	"net/http"
 	"os"
 	"time"
+
+	"ha-monitor/internal/tuya"
 )
 
 type Monitor struct {
 	url         string
 	token       string
 	notifyConf  NotifyConfig
+	tuyaClient  *tuya.Client
 	retryTimes  int
 	timeout     time.Duration
 	failCount   int
-	hasNotified bool // 添加标记，记录是否已发送故障通知
+	hasNotified bool
 	client      *http.Client
 }
 
@@ -27,34 +30,25 @@ type NotifyConfig struct {
 	TopicID  int
 }
 
-var successStatusCodes = []int{
-	http.StatusOK,        // 200
-	http.StatusCreated,   // 201
-	http.StatusAccepted,  // 202
-	http.StatusNoContent, // 204
-}
-
 func isSuccessStatus(code int) bool {
-	for _, status := range successStatusCodes {
-		if code == status {
-			return true
-		}
-	}
-	return false
+	return code >= 200 && code < 300
 }
 
-func NewMonitor(url string, token string, notify NotifyConfig, retryTimes int, timeout int) *Monitor {
+func NewMonitor(url string, token string, notify NotifyConfig, tuyaConfig tuya.Config, retryTimes int, timeout int) *Monitor {
 	if timeout <= 0 {
 		timeout = 10
 	}
+
+	httpClient := &http.Client{Timeout: time.Duration(timeout) * time.Second}
 
 	return &Monitor{
 		url:         url,
 		token:       token,
 		notifyConf:  notify,
+		tuyaClient:  tuya.NewClient(tuyaConfig, httpClient),
 		retryTimes:  retryTimes,
 		timeout:     time.Duration(timeout) * time.Second,
-		client:      &http.Client{Timeout: time.Duration(timeout) * time.Second},
+		client:      httpClient,
 		hasNotified: false,
 		failCount:   0,
 	}
@@ -66,13 +60,18 @@ func (m *Monitor) Check() error {
 		return fmt.Errorf("create request: %w", err)
 	}
 
-	// 添加认证头
 	req.Header.Add("Authorization", "Bearer "+m.token)
 
 	resp, err := m.client.Do(req)
 	if err != nil {
 		m.failCount++
 		if m.failCount >= m.retryTimes {
+			if m.tuyaClient != nil {
+				if err := m.tuyaClient.RestartDevice(); err != nil {
+					log.Printf("Failed to restart server: %v", err)
+				}
+			}
+
 			if err := m.notifyDown(); err != nil {
 				return fmt.Errorf("notification failed: %w", err)
 			}
@@ -85,6 +84,12 @@ func (m *Monitor) Check() error {
 	if !isSuccessStatus(resp.StatusCode) {
 		m.failCount++
 		if m.failCount >= m.retryTimes {
+			if m.tuyaClient != nil {
+				if err := m.tuyaClient.RestartDevice(); err != nil {
+					log.Printf("Failed to restart server: %v", err)
+				}
+			}
+
 			if err := m.notifyDown(); err != nil {
 				return fmt.Errorf("notification failed: %w", err)
 			}
@@ -157,10 +162,11 @@ func (m *Monitor) sendNotification(payload map[string]interface{}) error {
 	return nil
 }
 
-func (m *Monitor) UpdateConfig(url string, token string, notify NotifyConfig, retryTimes int, timeout int) {
+func (m *Monitor) UpdateConfig(url string, token string, notify NotifyConfig, tuyaConfig tuya.Config, retryTimes int, timeout int) {
 	m.url = url
 	m.token = token
 	m.notifyConf = notify
+	m.tuyaClient = tuya.NewClient(tuyaConfig, m.client)
 	m.retryTimes = retryTimes
 	if timeout <= 0 {
 		timeout = 10

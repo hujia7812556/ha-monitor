@@ -9,6 +9,7 @@ import (
 
 	"ha-monitor/internal/config"
 	"ha-monitor/internal/monitor"
+	"ha-monitor/internal/tuya"
 
 	"github.com/robfig/cron/v3"
 )
@@ -33,6 +34,14 @@ func main() {
 			APIToken: cfg.Monitor.Notify.APIToken,
 			TopicID:  cfg.Monitor.Notify.TopicID,
 		},
+		tuya.Config{
+			Enabled:     cfg.Monitor.Tuya.Enabled,
+			AccessID:    cfg.Monitor.Tuya.AccessID,
+			AccessKey:   cfg.Monitor.Tuya.AccessKey,
+			DeviceID:    cfg.Monitor.Tuya.DeviceID,
+			Region:      cfg.Monitor.Tuya.Region,
+			WaitSeconds: cfg.Monitor.Tuya.WaitSeconds,
+		},
 		cfg.Monitor.RetryTimes,
 		cfg.Monitor.Timeout,
 	)
@@ -50,6 +59,14 @@ func main() {
 				APIURL:   currentCfg.Monitor.Notify.APIURL,
 				APIToken: currentCfg.Monitor.Notify.APIToken,
 				TopicID:  currentCfg.Monitor.Notify.TopicID,
+			},
+			tuya.Config{
+				Enabled:     currentCfg.Monitor.Tuya.Enabled,
+				AccessID:    currentCfg.Monitor.Tuya.AccessID,
+				AccessKey:   currentCfg.Monitor.Tuya.AccessKey,
+				DeviceID:    currentCfg.Monitor.Tuya.DeviceID,
+				Region:      currentCfg.Monitor.Tuya.Region,
+				WaitSeconds: currentCfg.Monitor.Tuya.WaitSeconds,
 			},
 			currentCfg.Monitor.RetryTimes,
 			currentCfg.Monitor.Timeout,
