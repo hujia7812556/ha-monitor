@@ -20,11 +20,11 @@ jobs:
       - name: Generate config.yaml
         run: |
           cp config/config.example.yaml config.yaml
-          sed -i "s#ha_url:.*#ha_url: \"${{ secrets.HA_URL }}\"#" config/config.yaml
-          sed -i "s#ha_token:.*#ha_token: \"${{ secrets.HA_TOKEN }}\"#" config/config.yaml
-          sed -i "s#api_url:.*#api_url: \"${{ secrets.NOTIFY_API_URL }}\"#" config/config.yaml
-          sed -i "s#api_token:.*#api_token: \"${{ secrets.NOTIFY_API_TOKEN }}\"#" config/config.yaml
-          sed -i "s#topic_id:.*#topic_id: ${{ secrets.NOTIFY_TOPIC_ID }}#" config/config.yaml
+          sed -i "s#ha_url:.*#ha_url: \"${{ secrets.HA_URL }}\"#" config.yaml
+          sed -i "s#ha_token:.*#ha_token: \"${{ secrets.HA_TOKEN }}\"#" config.yaml
+          sed -i "s#api_url:.*#api_url: \"${{ secrets.NOTIFY_API_URL }}\"#" config.yaml
+          sed -i "s#api_token:.*#api_token: \"${{ secrets.NOTIFY_API_TOKEN }}\"#" config.yaml
+          sed -i "s#topic_id:.*#topic_id: ${{ secrets.NOTIFY_TOPIC_ID }}#" config.yaml
 
       - name: Generate supervisor.conf
         run: |
