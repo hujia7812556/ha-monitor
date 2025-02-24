@@ -35,6 +35,7 @@ type tokenInfo struct {
 	AccessToken  string    `json:"access_token"`
 	ExpireTime   time.Time // 本地计算的过期时间
 	RefreshToken string    `json:"refresh_token"`
+	Uid          string    `json:"uid"` // 添加 uid 字段
 }
 
 type tokenResponse struct {
@@ -43,6 +44,7 @@ type tokenResponse struct {
 		AccessToken  string `json:"access_token"`
 		ExpireTime   int64  `json:"expire_time"`
 		RefreshToken string `json:"refresh_token"`
+		Uid          string `json:"uid"` // 添加 uid 字段
 	} `json:"result"`
 }
 
@@ -116,7 +118,7 @@ func (c *Client) getNewToken() (*tokenInfo, error) {
 	contentSHA256 := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 	stringToSign := fmt.Sprintf("%s\n%s\n%s\n%s", "GET", contentSHA256, optionalSignatureKey.String(), path)
-	log.Printf("stringToSign: \n%s", stringToSign)
+	// log.Printf("stringToSign: \n%s", stringToSign)
 
 	// 获取令牌的签名，传入所有必要参数
 	signStr := c.getTokenSign(c.config.AccessID, c.config.AccessSecret, timestamp, nonce, stringToSign)
@@ -142,14 +144,14 @@ func (c *Client) getNewToken() (*tokenInfo, error) {
 	}
 
 	// 打印所有请求头
-	log.Printf("All Request Headers:")
-	for key, values := range req.Header {
-		log.Printf("%s: %v", key, values)
-	}
+	// log.Printf("All Request Headers:")
+	// for key, values := range req.Header {
+	// 	log.Printf("%s: %v", key, values)
+	// }
 
 	// 打印请求信息以便调试
-	log.Printf("Request URL: %s", url)
-	log.Printf("Sign Message: %s", signStr)
+	// log.Printf("Request URL: %s", url)
+	// log.Printf("Sign Message: %s", signStr)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -178,6 +180,7 @@ func (c *Client) getNewToken() (*tokenInfo, error) {
 		AccessToken:  result.Result.AccessToken,
 		RefreshToken: result.Result.RefreshToken,
 		ExpireTime:   time.Now().Add(time.Duration(result.Result.ExpireTime)*time.Second - 5*time.Minute),
+		Uid:          result.Result.Uid, // 添加 uid
 	}, nil
 }
 
@@ -185,8 +188,27 @@ func (c *Client) refreshToken(refreshToken string) (*tokenInfo, error) {
 	timestamp := time.Now().UnixMilli()
 	path := "/v1.0/token/" + refreshToken
 
-	// 刷新令牌的签名
-	signStr := c.getTokenSign(c.config.AccessID, c.config.AccessSecret, timestamp, "", path)
+	// 定义自定义字段
+	customFields := []customField{}
+
+	// 构建 Optional_Signature_key
+	var optionalSignatureKey strings.Builder
+	var signatureHeaders []string
+	for _, field := range customFields {
+		optionalSignatureKey.WriteString(fmt.Sprintf("%s:%s\n", field.key, field.value))
+		signatureHeaders = append(signatureHeaders, field.key)
+	}
+
+	// 生成 nonce
+	nonce := ""
+	// 生成 content-SHA256，因为Body为空，这里使用空字符串的hash值
+	contentSHA256 := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+	stringToSign := fmt.Sprintf("%s\n%s\n%s\n%s", "GET", contentSHA256, optionalSignatureKey.String(), path)
+	// log.Printf("stringToSign: \n%s", stringToSign)
+
+	// 获取令牌的签名，传入所有必要参数
+	signStr := c.getTokenSign(c.config.AccessID, c.config.AccessSecret, timestamp, nonce, stringToSign)
 
 	url := fmt.Sprintf("https://openapi.tuya%s.com%s", c.config.Region, path)
 	req, err := http.NewRequest("GET", url, nil)
@@ -195,30 +217,47 @@ func (c *Client) refreshToken(refreshToken string) (*tokenInfo, error) {
 	}
 
 	// 设置请求头
+	// req.Header.Set("method", "GET")
 	req.Header.Set("client_id", c.config.AccessID)
 	req.Header.Set("sign", signStr)
-	req.Header.Set("sign_method", "HMAC-SHA256")
 	req.Header.Set("t", fmt.Sprintf("%d", timestamp))
+	req.Header.Set("sign_method", "HMAC-SHA256")
+	req.Header.Set("nonce", nonce)
+	req.Header.Set("Signature-Headers", strings.Join(signatureHeaders, ":"))
+
+	// 设置自定义字段的请求头
+	for _, field := range customFields {
+		req.Header.Set(field.key, field.value)
+	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("refresh token failed: %w", err)
+		return nil, fmt.Errorf("get new token failed: %w", err)
 	}
 	defer resp.Body.Close()
 
+	// 读取并打印原始响应
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("read response body failed: %w", err)
+	}
+	log.Printf("Refresh token response: %s", string(respBody))
+
+	// 解析响应
 	var result tokenResponse
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, fmt.Errorf("decode refresh response failed: %w", err)
+	if err := json.Unmarshal(respBody, &result); err != nil {
+		return nil, fmt.Errorf("decode token response failed: %w", err)
 	}
 
 	if !result.Success {
-		return nil, fmt.Errorf("refresh token failed")
+		return nil, fmt.Errorf("get new token failed: %s", string(respBody))
 	}
 
 	return &tokenInfo{
 		AccessToken:  result.Result.AccessToken,
 		RefreshToken: result.Result.RefreshToken,
 		ExpireTime:   time.Now().Add(time.Duration(result.Result.ExpireTime)*time.Second - 5*time.Minute),
+		Uid:          result.Result.Uid, // 添加 uid
 	}, nil
 }
 
@@ -286,6 +325,7 @@ func (c *Client) controlSwitch(on bool) error {
 	if err != nil {
 		return fmt.Errorf("get token failed: %w", err)
 	}
+	log.Printf("token: %s", token)
 
 	// 计算签名
 	signStr := c.getTokenSign(c.config.AccessID, c.config.AccessSecret, timestamp, "", contentHash)

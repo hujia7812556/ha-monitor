@@ -72,9 +72,9 @@ func (m *Monitor) Check() error {
 				}
 			}
 
-			if err := m.notifyDown(); err != nil {
-				return fmt.Errorf("notification failed: %w", err)
-			}
+			// if err := m.notifyDown(); err != nil {
+			// 	return fmt.Errorf("notification failed: %w", err)
+			// }
 			m.hasNotified = true
 		}
 		return err
@@ -90,9 +90,9 @@ func (m *Monitor) Check() error {
 				}
 			}
 
-			if err := m.notifyDown(); err != nil {
-				return fmt.Errorf("notification failed: %w", err)
-			}
+			// if err := m.notifyDown(); err != nil {
+			// 	return fmt.Errorf("notification failed: %w", err)
+			// }
 			m.hasNotified = true
 		}
 		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
