@@ -3,9 +3,7 @@ package tuya
 import (
 	"bytes"
 	"crypto/hmac"
-	"crypto/rand"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -46,6 +44,12 @@ type tokenResponse struct {
 		ExpireTime   int64  `json:"expire_time"`
 		RefreshToken string `json:"refresh_token"`
 	} `json:"result"`
+}
+
+// 添加一个新的结构体来表示自定义字段
+type customField struct {
+	key   string
+	value string
 }
 
 func NewClient(config Config, httpClient *http.Client) *Client {
@@ -91,35 +95,27 @@ func (c *Client) getTokenSign(clientID string, secret string, timestamp int64, n
 	return strings.ToUpper(hex.EncodeToString(h.Sum(nil)))
 }
 
-func generateNonce() string {
-	// 创建一个 16 字节的随机数
-	b := make([]byte, 16)
-	_, err := rand.Read(b)
-	if err != nil {
-		// 如果生成失败，使用时间戳作为备选
-		return fmt.Sprintf("%x", time.Now().UnixNano())
-	}
-	// 使用 base64 编码，并移除可能的特殊字符
-	return strings.TrimRight(base64.URLEncoding.EncodeToString(b), "=")
-}
-
 func (c *Client) getNewToken() (*tokenInfo, error) {
 	timestamp := time.Now().UnixMilli()
 	path := "/v1.0/token?grant_type=1"
 
-	// 生成自定义字段值
-	areaID := fmt.Sprintf("%x", sha256.Sum256([]byte(c.config.AccessID)))[:16]
-	callID := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d", timestamp))))[:32]
+	// 定义自定义字段
+	customFields := []customField{}
 
 	// 构建 Optional_Signature_key
-	optionalSignatureKey := fmt.Sprintf("area_id:%s\ncall_id:%s\n", areaID, callID)
+	var optionalSignatureKey strings.Builder
+	var signatureHeaders []string
+	for _, field := range customFields {
+		optionalSignatureKey.WriteString(fmt.Sprintf("%s:%s\n", field.key, field.value))
+		signatureHeaders = append(signatureHeaders, field.key)
+	}
 
 	// 生成 nonce
-	nonce := generateNonce()
+	nonce := ""
 	// 生成 content-SHA256，因为Body为空，这里使用空字符串的hash值
 	contentSHA256 := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
-	stringToSign := fmt.Sprintf("%s\n%s\n%s\n%s", "GET", contentSHA256, optionalSignatureKey, path)
+	stringToSign := fmt.Sprintf("%s\n%s\n%s\n%s", "GET", contentSHA256, optionalSignatureKey.String(), path)
 	log.Printf("stringToSign: \n%s", stringToSign)
 
 	// 获取令牌的签名，传入所有必要参数
@@ -132,19 +128,27 @@ func (c *Client) getNewToken() (*tokenInfo, error) {
 	}
 
 	// 设置请求头
-	req.Header.Set("method", "GET")
+	// req.Header.Set("method", "GET")
 	req.Header.Set("client_id", c.config.AccessID)
-	req.Header.Set("secret", c.config.AccessSecret)
+	req.Header.Set("sign", signStr)
 	req.Header.Set("t", fmt.Sprintf("%d", timestamp))
 	req.Header.Set("sign_method", "HMAC-SHA256")
-	req.Header.Set("Signature-Headers", "area_id:call_id") // 指定参与签名的字段
-	req.Header.Set("area_id", areaID)                      // 设置自定义字段
-	req.Header.Set("call_id", callID)                      // 设置自定义字段
+	req.Header.Set("nonce", nonce)
+	req.Header.Set("Signature-Headers", strings.Join(signatureHeaders, ":"))
+
+	// 设置自定义字段的请求头
+	for _, field := range customFields {
+		req.Header.Set(field.key, field.value)
+	}
+
+	// 打印所有请求头
+	log.Printf("All Request Headers:")
+	for key, values := range req.Header {
+		log.Printf("%s: %v", key, values)
+	}
 
 	// 打印请求信息以便调试
 	log.Printf("Request URL: %s", url)
-	log.Printf("Request Headers: client_id=%s, t=%d, area_id=%s, call_id=%s",
-		c.config.AccessID, timestamp, areaID, callID)
 	log.Printf("Sign Message: %s", signStr)
 
 	resp, err := c.client.Do(req)
