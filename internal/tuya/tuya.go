@@ -3,7 +3,9 @@ package tuya
 import (
 	"bytes"
 	"crypto/hmac"
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -16,12 +18,12 @@ import (
 )
 
 type Config struct {
-	Enabled     bool
-	AccessID    string
-	AccessKey   string
-	DeviceID    string
-	Region      string
-	WaitSeconds int
+	Enabled      bool
+	AccessID     string
+	AccessSecret string
+	DeviceID     string
+	Region       string
+	WaitSeconds  int
 }
 
 type Client struct {
@@ -77,29 +79,51 @@ func (c *Client) RestartDevice() error {
 	return nil
 }
 
-func (c *Client) getTokenSign(method, bodyHash, token, path string, timestamp int64) string {
-	// 构建 stringToSign
-	// method + "\n" + bodyHash + "\n" + token + "\n" + path
-	stringToSign := fmt.Sprintf("%s\n%s\n%s\n%s", method, bodyHash, token, path)
-
+func (c *Client) getTokenSign(clientID string, secret string, timestamp int64, nonce string, stringToSign string) string {
 	// 构建完整签名字符串：client_id + t + nonce + stringToSign
-	// nonce 是可选的，这里我们不使用
-	str := fmt.Sprintf("%s%d%s", c.config.AccessID, timestamp, stringToSign)
+	str := fmt.Sprintf("%s%d%s%s", clientID, timestamp, nonce, stringToSign)
 
 	// 使用 HMAC-SHA256 计算签名
-	h := hmac.New(sha256.New, []byte(c.config.AccessKey))
+	h := hmac.New(sha256.New, []byte(secret))
 	h.Write([]byte(str))
 
 	// 转换为大写的十六进制字符串
 	return strings.ToUpper(hex.EncodeToString(h.Sum(nil)))
 }
 
+func generateNonce() string {
+	// 创建一个 16 字节的随机数
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		// 如果生成失败，使用时间戳作为备选
+		return fmt.Sprintf("%x", time.Now().UnixNano())
+	}
+	// 使用 base64 编码，并移除可能的特殊字符
+	return strings.TrimRight(base64.URLEncoding.EncodeToString(b), "=")
+}
+
 func (c *Client) getNewToken() (*tokenInfo, error) {
 	timestamp := time.Now().UnixMilli()
 	path := "/v1.0/token?grant_type=1"
 
-	// 获取令牌的签名
-	signStr := c.getTokenSign("GET", "", "", path, timestamp)
+	// 生成自定义字段值
+	areaID := fmt.Sprintf("%x", sha256.Sum256([]byte(c.config.AccessID)))[:16]
+	callID := fmt.Sprintf("%x", sha256.Sum256([]byte(fmt.Sprintf("%d", timestamp))))[:32]
+
+	// 构建 Optional_Signature_key
+	optionalSignatureKey := fmt.Sprintf("area_id:%s\ncall_id:%s\n", areaID, callID)
+
+	// 生成 nonce
+	nonce := generateNonce()
+	// 生成 content-SHA256，因为Body为空，这里使用空字符串的hash值
+	contentSHA256 := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+	stringToSign := fmt.Sprintf("%s\n%s\n%s\n%s", "GET", contentSHA256, optionalSignatureKey, path)
+	log.Printf("stringToSign: \n%s", stringToSign)
+
+	// 获取令牌的签名，传入所有必要参数
+	signStr := c.getTokenSign(c.config.AccessID, c.config.AccessSecret, timestamp, nonce, stringToSign)
 
 	url := fmt.Sprintf("https://openapi.tuya%s.com%s", c.config.Region, path)
 	req, err := http.NewRequest("GET", url, nil)
@@ -108,14 +132,19 @@ func (c *Client) getNewToken() (*tokenInfo, error) {
 	}
 
 	// 设置请求头
+	req.Header.Set("method", "GET")
 	req.Header.Set("client_id", c.config.AccessID)
-	req.Header.Set("secret", signStr)
-	req.Header.Set("sign_method", "HMAC-SHA256")
+	req.Header.Set("secret", c.config.AccessSecret)
 	req.Header.Set("t", fmt.Sprintf("%d", timestamp))
+	req.Header.Set("sign_method", "HMAC-SHA256")
+	req.Header.Set("Signature-Headers", "area_id:call_id") // 指定参与签名的字段
+	req.Header.Set("area_id", areaID)                      // 设置自定义字段
+	req.Header.Set("call_id", callID)                      // 设置自定义字段
 
 	// 打印请求信息以便调试
 	log.Printf("Request URL: %s", url)
-	log.Printf("Request Headers: client_id=%s, t=%d", c.config.AccessID, timestamp)
+	log.Printf("Request Headers: client_id=%s, t=%d, area_id=%s, call_id=%s",
+		c.config.AccessID, timestamp, areaID, callID)
 	log.Printf("Sign Message: %s", signStr)
 
 	resp, err := c.client.Do(req)
@@ -153,7 +182,7 @@ func (c *Client) refreshToken(refreshToken string) (*tokenInfo, error) {
 	path := "/v1.0/token/" + refreshToken
 
 	// 刷新令牌的签名
-	signStr := c.getTokenSign("GET", "", "", path, timestamp)
+	signStr := c.getTokenSign(c.config.AccessID, c.config.AccessSecret, timestamp, "", path)
 
 	url := fmt.Sprintf("https://openapi.tuya%s.com%s", c.config.Region, path)
 	req, err := http.NewRequest("GET", url, nil)
@@ -255,7 +284,7 @@ func (c *Client) controlSwitch(on bool) error {
 	}
 
 	// 计算签名
-	signStr := c.getTokenSign("POST", contentHash, token, path, timestamp)
+	signStr := c.getTokenSign(c.config.AccessID, c.config.AccessSecret, timestamp, "", contentHash)
 
 	url := fmt.Sprintf("https://openapi.tuya%s.com%s", c.config.Region, path)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))

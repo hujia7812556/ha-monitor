@@ -30,12 +30,12 @@ type NotifyConfig struct {
 }
 
 type TuyaConfig struct {
-	Enabled     bool   `mapstructure:"enabled"`
-	AccessID    string `mapstructure:"access_id"`
-	AccessKey   string `mapstructure:"access_key"`
-	DeviceID    string `mapstructure:"device_id"`
-	Region      string `mapstructure:"region"`
-	WaitSeconds int    `mapstructure:"wait_seconds"`
+	Enabled      bool   `mapstructure:"enabled"`
+	AccessID     string `mapstructure:"access_id"`
+	AccessSecret string `mapstructure:"access_secret"`
+	DeviceID     string `mapstructure:"device_id"`
+	Region       string `mapstructure:"region"`
+	WaitSeconds  int    `mapstructure:"wait_seconds"`
 }
 
 type Loader struct {
